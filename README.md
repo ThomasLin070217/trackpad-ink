@@ -22,13 +22,20 @@ Touch the trackpad while the lab window is focused. If a stroke appears, that in
 
 Convert recognized trackpad positions into controlled pen or mouse strokes in the selected Mac app, with Goodnotes as the primary target. The first integration milestone is a short handwritten note that can be saved and reopened in Goodnotes.
 
+## Usability baseline
+
+On an M4 MacBook Air running macOS 15.7.9, a hands-on trial of `ongchi/stylus` produced handwriting that the user found unreliable. The same user found macOS's built-in Three-Finger Drag easier to write with. This is a first-person usability report, not a controlled benchmark.
+
+Three-Finger Drag is already enabled on the test Mac. New prototypes should be compared with it in Goodnotes using the same short words, equations, and pen lifts. We should measure missing strokes, unintended marks, cursor placement, and writing effort. A custom input mode is only worthwhile if it improves on that baseline.
+
 ## Roadmap
 
-1. Measure which pens generate usable trackpad touches and how precise the positions are.
-2. Add an explicit pen-mode toggle and map absolute trackpad positions to a selectable screen region.
-3. Send strokes to Goodnotes and verify the saved document, including lifts between strokes, undo, and navigation.
-4. Improve jitter filtering, palm rejection, calibration, and multi-display behavior.
-5. Research whether Apple Pencil input is possible with additional hardware. Keep this work separate from the software-only milestones.
+1. Record a short Goodnotes handwriting sample with native Three-Finger Drag as the baseline.
+2. Measure which pens generate usable trackpad touches and how precise the positions are.
+3. Prototype one alternative input mode and compare it with the baseline before adding more features.
+4. If the prototype is better, send strokes to Goodnotes and verify the saved document, including lifts between strokes, undo, and navigation.
+5. Improve jitter filtering, palm rejection, calibration, and multi-display behavior only where testing shows a benefit.
+6. Research whether Apple Pencil input is possible with additional hardware. Keep this work separate from the software-only milestones.
 
 ## Constraints
 
