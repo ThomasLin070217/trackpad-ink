@@ -15,6 +15,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
     private var controlWindow: NSWindow!
     private var controlButton: NSButton!
     private var statusLabel: NSTextField!
+    private var diagnosticsLabel: NSTextField!
     private var eventTap: CFMachPort?
     private var tapSource: CFRunLoopSource?
     private var touchTask: Task<Void, Never>?
@@ -23,6 +24,12 @@ final class Bridge: NSObject, NSApplicationDelegate {
     private var waitingForClear = false
     private var strokeDown = false
     private var lastPoint: CGPoint?
+    private var touchFrames = 0
+    private var contactFrames = 0
+    private var pointerMoves = 0
+    private var nativeDrags = 0
+    private var emittedDrags = 0
+    private var strokeStarts = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -58,7 +65,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
 
     private func makeControlWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 190),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 220),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered, defer: false
         )
@@ -67,14 +74,18 @@ final class Bridge: NSObject, NSApplicationDelegate {
         let content = NSView(frame: window.contentView?.bounds ?? .zero)
         let title = NSTextField(labelWithString: "用触控板在 Goodnotes 里试写")
         title.font = .boldSystemFont(ofSize: 18)
-        title.frame = NSRect(x: 24, y: 132, width: 410, height: 28)
+        title.frame = NSRect(x: 24, y: 162, width: 450, height: 28)
         content.addSubview(title)
         let help = NSTextField(wrappingLabelWithString: "先在 Goodnotes 选好钢笔。开始后切回 Goodnotes，把光标放在空白页上；单指接触落笔，抬起结束。")
-        help.frame = NSRect(x: 24, y: 78, width: 410, height: 46)
+        help.frame = NSRect(x: 24, y: 108, width: 450, height: 46)
         content.addSubview(help)
         let status = NSTextField(labelWithString: "Off — Goodnotes only")
-        status.frame = NSRect(x: 24, y: 50, width: 410, height: 20)
+        status.frame = NSRect(x: 24, y: 80, width: 450, height: 20)
         content.addSubview(status)
+        let diagnostics = NSTextField(labelWithString: "触点帧 0 / 有效接触 0 / 指针移动 0 / 原生拖动 0 / 发出拖动 0")
+        diagnostics.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        diagnostics.frame = NSRect(x: 24, y: 53, width: 450, height: 20)
+        content.addSubview(diagnostics)
         let button = NSButton(title: "开始试写", target: self, action: #selector(toggle))
         button.bezelStyle = .rounded
         button.frame = NSRect(x: 24, y: 14, width: 110, height: 30)
@@ -85,6 +96,11 @@ final class Bridge: NSObject, NSApplicationDelegate {
         controlWindow = window
         controlButton = button
         statusLabel = status
+        diagnosticsLabel = diagnostics
+    }
+
+    private func updateDiagnostics() {
+        diagnosticsLabel.stringValue = "触点 \(touchFrames)/\(contactFrames) · 起笔 \(strokeStarts) · 移动 \(pointerMoves) · 原生拖动 \(nativeDrags) · 发出拖动 \(emittedDrags)"
     }
 
     private func setStatus(_ value: String) {
@@ -127,6 +143,13 @@ final class Bridge: NSObject, NSApplicationDelegate {
             return
         }
         armed = true
+        touchFrames = 0
+        contactFrames = 0
+        pointerMoves = 0
+        nativeDrags = 0
+        emittedDrags = 0
+        strokeStarts = 0
+        updateDiagnostics()
         toggleItem.title = "Stop Goodnotes bridge"
         controlButton.title = "停止试写"
         setStatus("已就绪：切回 Goodnotes 后试写")
@@ -152,7 +175,10 @@ final class Bridge: NSObject, NSApplicationDelegate {
 
     private func handle(_ frame: [OMSTouchData]) {
         guard armed else { return }
+        touchFrames += 1
         let contacts = frame.filter { $0.state == .making || $0.state == .touching }
+        if !contacts.isEmpty { contactFrames += 1 }
+        if touchFrames.isMultiple(of: 20) { updateDiagnostics() }
         if contacts.count > 1 {
             endStroke()
             activeTouchID = nil
@@ -181,6 +207,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
         postMouse(.leftMouseDown, at: point)
         lastPoint = point
         strokeDown = true
+        strokeStarts += 1
         setStatus("正在书写；抬起结束这一笔")
     }
 
@@ -242,13 +269,16 @@ final class Bridge: NSObject, NSApplicationDelegate {
             return Unmanaged.passUnretained(event)
         }
         switch type {
-        case .mouseMoved:
+        case .mouseMoved, .leftMouseDragged:
+            if type == .mouseMoved { pointerMoves += 1 } else { nativeDrags += 1 }
             if strokeDown {
                 lastPoint = event.location
                 postMouse(.leftMouseDragged, at: event.location)
+                emittedDrags += 1
             }
-            return Unmanaged.passUnretained(event)
-        case .leftMouseDown, .leftMouseUp, .leftMouseDragged:
+            if (pointerMoves + nativeDrags).isMultiple(of: 20) { updateDiagnostics() }
+            return type == .mouseMoved ? Unmanaged.passUnretained(event) : nil
+        case .leftMouseDown, .leftMouseUp:
             // Drawing mode owns clicks; stop the bridge to use Goodnotes controls.
             return nil
         default:

@@ -29,7 +29,9 @@ The bridge currently targets the installed Goodnotes bundle ID `com.goodnotesapp
 ./scripts/build-app.sh
 ```
 
-Open `dist/Trackpad Ink.app`. Its control window has **开始试写** and **停止试写** buttons. Grant the macOS permissions when prompted, restart the app if macOS asks, and press Start again. Open Goodnotes, select its pen tool, put the cursor over a blank page, and write with one finger or a passive capacitive stylus. Lifting should finish one stroke. A second contact stops drawing until all contacts lift. Goodnotes controls cannot be clicked while drawing mode is on; use **停止试写** first. The **✎ Ink** menu bar item also has Start, Stop, and Quit controls.
+Open `dist/Trackpad Ink.app`. Its control window has **开始试写** and **停止试写** buttons. Grant the macOS permissions when prompted, restart the app if macOS asks, and press Start again. Open Goodnotes, select its pen tool, put the cursor over a blank page, and write with one finger or a passive capacitive stylus. Lifting should finish one stroke. A second contact stops drawing until all contacts lift. Goodnotes controls cannot be clicked while drawing mode is on; use **停止试写** first. The **✎ Ink** menu bar item also has Start, Stop, and Quit controls. Rebuilding this locally signed app can make macOS request Input Monitoring and Accessibility access again.
+
+The first Goodnotes trial on 2026-10-29 produced only the initial ink dot. The event tap discarded native `leftMouseDragged` events, which macOS can produce after the bridge sends `leftMouseDown`. The current source handles those drag events and shows touch, move, and drag counters in the control window. This fix has compiled but **has not yet been verified with another physical handwriting trial**.
 
 The bridge uses macOS's cursor path, including the system's pointer processing. It uses raw touch frames only to detect contact and lift. It does **not** reproduce Apple's proprietary pointer algorithm or use TrackpadDraft's code. It posts normal left mouse down/drag/up events, so it cannot provide true pen pressure or tilt. No strokes are recorded or sent over a network.
 
