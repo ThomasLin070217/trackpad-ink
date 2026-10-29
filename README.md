@@ -4,7 +4,10 @@ An open-source experiment to write into Mac apps such as Goodnotes using a MacBo
 
 ## Current status
 
-This repository currently contains an **input lab**, not a Goodnotes integration. It shows strokes from a finger or a passive capacitive pen when the Mac trackpad recognizes that contact. It does not inject input into other apps.
+This repository contains two experimental tools:
+
+- `TrackpadInkLab` displays raw touches inside its own window.
+- `TrackpadInkBridge` turns recognized single-contact motion into mouse strokes in the **frontmost Goodnotes app**. It is a compiled prototype; handwriting quality and Goodnotes compatibility still need hands-on testing.
 
 Apple Pencil is not recognized by current MacBook trackpad hardware. This project will investigate that separately; its software prototype does **not** claim Apple Pencil compatibility.
 
@@ -17,6 +20,26 @@ swift run TrackpadInkLab
 ```
 
 Touch the trackpad while the lab window is focused. If a stroke appears, that input method is detected. Press Delete to clear the canvas. Try a finger first, then a passive capacitive pen. A pen that works on an iPad as an active stylus is not automatically a capacitive pen.
+
+## Try the Goodnotes bridge
+
+The bridge currently targets the installed Goodnotes bundle ID `com.goodnotesapp.x` and was built on macOS 15.7.9 with Swift 6.1.2. It requires **Input Monitoring** and **Accessibility** access to monitor pointer events and post drawing events. It also uses [OpenMultitouchSupport 3.0.3](https://github.com/Kyome22/OpenMultitouchSupport), an MIT-licensed wrapper around Apple's **private** `MultitouchSupport.framework`; this can break with a macOS update and requires the app sandbox to be off.
+
+```sh
+swift run TrackpadInkBridge
+```
+
+Click **✎ Ink** in the menu bar, then **Start Goodnotes bridge**. Grant the macOS permissions when prompted, and retry Start if macOS has not applied them yet. Open Goodnotes, select its pen tool, put the cursor over a blank page, and write with one finger or a passive capacitive stylus. Lifting should finish one stroke. A second contact stops drawing until all contacts lift. Goodnotes controls cannot be clicked while drawing mode is on; use the menu bar to stop the bridge first. Quit from the same menu.
+
+The bridge uses macOS's cursor path, including the system's pointer processing. It uses raw touch frames only to detect contact and lift. It does **not** reproduce Apple's proprietary pointer algorithm or use TrackpadDraft's code. It posts normal left mouse down/drag/up events, so it cannot provide true pen pressure or tilt. No strokes are recorded or sent over a network.
+
+**Test still needed:** short words and equations in Goodnotes, missing strokes after lifting, accidental clicks, and whether a chosen pen moves the cursor at all. The bridge is a research prototype and may feel worse than native Three-Finger Drag. Stop it from the menu if it interferes with navigation.
+
+### Which pens can work?
+
+- **Apple Pencil:** current MacBook trackpads do not pair with or decode its active pen signal. Software alone cannot make its tip work here. Use an iPad as the Pencil input device if Apple Pencil is required.
+- **Passive capacitive stylus:** may work if its tip registers like a finger and moves the Mac cursor. The lab checks detection; handwriting precision remains to be tested.
+- **Trackpad-specific active pen:** [SonarPen USB-C for Mac](https://www.sonarpen.com/mac) is a vendor-documented hardware and driver route that claims trackpad drawing and pressure. It is a proprietary solution, and we have not verified it in Goodnotes. Its dedicated driver would handle pen identification and pressure; this bridge does not talk to that driver.
 
 ## Goal
 
@@ -41,7 +64,7 @@ Three-Finger Drag is already enabled on the test Mac. New prototypes should be c
 
 - The trackpad's small size may make sustained handwriting uncomfortable.
 - A passive capacitive pen may have less precision than an active pen.
-- Global event injection will require macOS permissions and must be tested against Goodnotes; this repository does not yet provide it.
+- Global event injection requires macOS permissions and still needs hands-on testing against Goodnotes.
 - Any Apple private API explored later may break across macOS releases.
 
 ## License
