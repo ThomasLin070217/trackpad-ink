@@ -12,6 +12,9 @@ final class Bridge: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var toggleItem: NSMenuItem!
     private var detailItem: NSMenuItem!
+    private var controlWindow: NSWindow!
+    private var controlButton: NSButton!
+    private var statusLabel: NSTextField!
     private var eventTap: CFMachPort?
     private var tapSource: CFRunLoopSource?
     private var touchTask: Task<Void, Never>?
@@ -22,7 +25,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
     private var lastPoint: CGPoint?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "✎ Ink"
         let menu = NSMenu()
@@ -33,6 +36,9 @@ final class Bridge: NSObject, NSApplicationDelegate {
         detail.isEnabled = false
         menu.addItem(detail)
         menu.addItem(.separator())
+        let show = NSMenuItem(title: "Show control window", action: #selector(showWindow), keyEquivalent: "")
+        show.target = self
+        menu.addItem(show)
         let quit = NSMenuItem(title: "Quit Trackpad Ink", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
@@ -40,6 +46,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
         statusItem = item
         toggleItem = toggle
         detailItem = detail
+        makeControlWindow()
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -49,8 +56,49 @@ final class Bridge: NSObject, NSApplicationDelegate {
         )
     }
 
+    private func makeControlWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 190),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered, defer: false
+        )
+        window.title = "Trackpad Ink — Goodnotes Bridge"
+        window.center()
+        let content = NSView(frame: window.contentView?.bounds ?? .zero)
+        let title = NSTextField(labelWithString: "用触控板在 Goodnotes 里试写")
+        title.font = .boldSystemFont(ofSize: 18)
+        title.frame = NSRect(x: 24, y: 132, width: 410, height: 28)
+        content.addSubview(title)
+        let help = NSTextField(wrappingLabelWithString: "先在 Goodnotes 选好钢笔。开始后切回 Goodnotes，把光标放在空白页上；单指接触落笔，抬起结束。")
+        help.frame = NSRect(x: 24, y: 78, width: 410, height: 46)
+        content.addSubview(help)
+        let status = NSTextField(labelWithString: "Off — Goodnotes only")
+        status.frame = NSRect(x: 24, y: 50, width: 410, height: 20)
+        content.addSubview(status)
+        let button = NSButton(title: "开始试写", target: self, action: #selector(toggle))
+        button.bezelStyle = .rounded
+        button.frame = NSRect(x: 24, y: 14, width: 110, height: 30)
+        content.addSubview(button)
+        window.contentView = content
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        controlWindow = window
+        controlButton = button
+        statusLabel = status
+    }
+
+    private func setStatus(_ value: String) {
+        detailItem.title = value
+        statusLabel.stringValue = value
+    }
+
     @objc private func toggle() {
         if armed { stop() } else { start() }
+    }
+
+    @objc private func showWindow() {
+        controlWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func start() {
@@ -58,11 +106,11 @@ final class Bridge: NSObject, NSApplicationDelegate {
         let canListen = CGRequestListenEventAccess()
         let canPost = CGRequestPostEventAccess()
         guard canListen && canPost else {
-            detailItem.title = "Grant Input Monitoring and Accessibility, then retry"
+            setStatus("请授权输入监控和辅助功能，再按开始")
             return
         }
         guard installTap() else {
-            detailItem.title = "Input Monitoring permission needed; restart after granting it"
+            setStatus("输入监控尚未生效；授权后重试")
             return
         }
         let stream = manager.touchDataStream
@@ -75,12 +123,13 @@ final class Bridge: NSObject, NSApplicationDelegate {
             touchTask?.cancel()
             touchTask = nil
             removeTap()
-            detailItem.title = "Could not read trackpad contacts"
+            setStatus("无法读取触控板触点")
             return
         }
         armed = true
         toggleItem.title = "Stop Goodnotes bridge"
-        detailItem.title = "Ready — switch to Goodnotes and touch trackpad"
+        controlButton.title = "停止试写"
+        setStatus("已就绪：切回 Goodnotes 后试写")
     }
 
     private func stop() {
@@ -93,7 +142,8 @@ final class Bridge: NSObject, NSApplicationDelegate {
         touchTask = nil
         removeTap()
         toggleItem.title = "Start Goodnotes bridge"
-        detailItem.title = "Off — Goodnotes only"
+        controlButton.title = "开始试写"
+        setStatus("已停止")
     }
 
     private func isGoodnotesFrontmost() -> Bool {
@@ -107,14 +157,14 @@ final class Bridge: NSObject, NSApplicationDelegate {
             endStroke()
             activeTouchID = nil
             waitingForClear = true
-            detailItem.title = "Multiple contacts — lift all fingers to reset"
+            setStatus("检测到多点接触；抬起所有手指后重试")
             return
         }
         if frame.isEmpty || contacts.isEmpty {
             endStroke()
             activeTouchID = nil
             waitingForClear = false
-            detailItem.title = isGoodnotesFrontmost() ? "Ready — next stroke" : "Ready — switch to Goodnotes"
+            setStatus(isGoodnotesFrontmost() ? "已就绪：可以写下一笔" : "已就绪：切回 Goodnotes")
             return
         }
         guard !waitingForClear, let contact = contacts.first else { return }
@@ -131,7 +181,7 @@ final class Bridge: NSObject, NSApplicationDelegate {
         postMouse(.leftMouseDown, at: point)
         lastPoint = point
         strokeDown = true
-        detailItem.title = "Drawing — lift to finish"
+        setStatus("正在书写；抬起结束这一笔")
     }
 
     private func endStroke() {

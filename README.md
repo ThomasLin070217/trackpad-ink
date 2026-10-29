@@ -26,10 +26,10 @@ Touch the trackpad while the lab window is focused. If a stroke appears, that in
 The bridge currently targets the installed Goodnotes bundle ID `com.goodnotesapp.x` and was built on macOS 15.7.9 with Swift 6.1.2. It requires **Input Monitoring** and **Accessibility** access to monitor pointer events and post drawing events. It also uses [OpenMultitouchSupport 3.0.3](https://github.com/Kyome22/OpenMultitouchSupport), an MIT-licensed wrapper around Apple's **private** `MultitouchSupport.framework`; this can break with a macOS update and requires the app sandbox to be off.
 
 ```sh
-swift run TrackpadInkBridge
+./scripts/build-app.sh
 ```
 
-Click **✎ Ink** in the menu bar, then **Start Goodnotes bridge**. Grant the macOS permissions when prompted, and retry Start if macOS has not applied them yet. Open Goodnotes, select its pen tool, put the cursor over a blank page, and write with one finger or a passive capacitive stylus. Lifting should finish one stroke. A second contact stops drawing until all contacts lift. Goodnotes controls cannot be clicked while drawing mode is on; use the menu bar to stop the bridge first. Quit from the same menu.
+Open `dist/Trackpad Ink.app`. Its control window has **开始试写** and **停止试写** buttons. Grant the macOS permissions when prompted, restart the app if macOS asks, and press Start again. Open Goodnotes, select its pen tool, put the cursor over a blank page, and write with one finger or a passive capacitive stylus. Lifting should finish one stroke. A second contact stops drawing until all contacts lift. Goodnotes controls cannot be clicked while drawing mode is on; use **停止试写** first. The **✎ Ink** menu bar item also has Start, Stop, and Quit controls.
 
 The bridge uses macOS's cursor path, including the system's pointer processing. It uses raw touch frames only to detect contact and lift. It does **not** reproduce Apple's proprietary pointer algorithm or use TrackpadDraft's code. It posts normal left mouse down/drag/up events, so it cannot provide true pen pressure or tilt. No strokes are recorded or sent over a network.
 
